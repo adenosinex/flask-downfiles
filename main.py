@@ -1,8 +1,35 @@
 import os
 import json
+import inspect
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from utils import save_data, download_file, create_hard_link, delayed_task, make_valid_windows_filename, url_toid
+from collections import defaultdict
+
+# 全局字典用于统计打印次数
+print_stats = defaultdict(int)
+
+def optimized_print(message):
+    """
+    优化的打印函数：
+    - 第一次打印消息。
+    - 后续只统计次数，达到 5 次后打印统计数据。
+    - 判断是否为同一处打印（基于调用位置）。
+    """
+    # 获取调用位置（文件名和行号）
+    caller_frame = inspect.stack()[1]
+    caller_location = f"{caller_frame.filename}:{caller_frame.lineno}"
+
+    # 使用调用位置作为唯一标识
+    global print_stats
+    if print_stats[caller_location] == 0:
+        # 第一次打印消息
+        print(message)
+    print_stats[caller_location] += 1
+
+    # 每 5 次打印统计数据
+    if print_stats[caller_location] % 10 == 0:
+        print(f"调用位置 '{caller_location}' 的消息已打印 {print_stats[caller_location]} 次\n",message)
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -77,28 +104,30 @@ def create_hard_link_task(file_id):
     创建硬链接任务。
     """
     if file_id not in data_store:
-        print(f"文件 ID {file_id} 不存在")
+        optimized_print(f"文件 ID {file_id} 不存在")
         return
 
     file_name = data_store[file_id]['file_name']
     filename = make_valid_windows_filename(file_name)
     source = os.path.join(DOWNLOAD_FOLDER, f"{file_id}.mp4")
     target = os.path.join(LINK_FOLDER, filename)
-
+    if os.path.exists(target):
+        optimized_print(f"硬链接已存在: {target}")
+        return
     if os.path.exists(source):
         create_hard_link(source, target)
-        print(f"硬链接已创建: {target}")
+        optimized_print(f"硬链接已创建: {target}")
     else:
-        print(f"源文件不存在: {source}")
+        optimized_print(f"源文件不存在: {source}")
 
 def initialize_hard_links():
     """
     程序启动时对所有已下载文件的 file_id 执行 create_hard_link_task。
     """
-    print("初始化硬链接任务...")
+    optimized_print("初始化硬链接任务...")
     for file_id in data_store.keys():
         create_hard_link_task(file_id)
-    print("硬链接初始化完成。")
+    optimized_print("硬链接初始化完成。")
 
 if __name__ == '__main__':
     # 程序启动时初始化硬链接
