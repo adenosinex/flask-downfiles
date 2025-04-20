@@ -15,3 +15,6 @@ docker-compose down
 git remote add downfile http://192.168.31.28:8418/xin
 
 git push --set-upstream downfile master
+
+
+cd /vol1/1000/myapp/downfile
