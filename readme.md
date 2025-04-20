@@ -10,3 +10,6 @@ docker-compose up --build -d
 docker-compose down
 5. 验证
 访问 http://localhost:9090，确认 Flask 应用已成功运行
+
+
+git remote add downfile http://192.168.31.28:8418/xin
