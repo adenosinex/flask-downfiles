@@ -1,3 +1,4 @@
+import datetime
 import os
 import json
 import inspect
@@ -8,7 +9,7 @@ from collections import defaultdict
 
 # 全局字典用于统计打印次数
 print_stats = defaultdict(int)
-
+today=datetime.datetime.today().strftime('%Y-%m-%d')
 def optimized_print(message):
     """
     优化的打印函数：
@@ -35,8 +36,18 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
 # 配置
-DOWNLOAD_FOLDER = './downloads'
-LINK_FOLDER = './links'
+DOWNLOAD_FOLDER = './downloads'+'/'+today
+if not os.path.exists(DOWNLOAD_FOLDER):
+    os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+LINK_FOLDER = './links'+'/'+today
+if not os.path.exists(LINK_FOLDER):
+    os.makedirs(LINK_FOLDER, exist_ok=True)
+
+old_ids=set()
+for i in os.walk('./downloads'):
+    for j in i[2]:
+        old_ids.add(j.split('.')[0])
+
 DATA_FILE = './data.json'
 
 # 确保文件夹存在
@@ -57,6 +68,13 @@ def file_axios():
     """
     return send_file('static/axios.min.js')
 
+@app.route('/op')
+def file_op():
+    """
+    提供静态文件 op.min.js 的访问路径。
+    """
+    return jsonify({'op': 'ok'})
+
 @app.route('/download', methods=['POST'])
 def download():
     """
@@ -68,12 +86,15 @@ def download():
 
     if not file_id:
         return jsonify({'error': '无法从 URL 提取文件 ID'}), 400
-
+    
     file_name = f"{file_id}.mp4"
     file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
 
+    if file_id in old_ids or os.path.exists(file_path):
+        return jsonify({'error': '文件已存在'}), 400
+
     if download_file(url, file_path):
-        delayed_task(3, create_hard_link_task, file_id)()
+        delayed_task(10, create_hard_link_task, file_id)()
         return jsonify({'message': '文件下载成功', 'file_id': file_id}), 200
     else:
         return jsonify({'error': '文件下载失败'}), 500
@@ -125,7 +146,11 @@ def initialize_hard_links():
     程序启动时对所有已下载文件的 file_id 执行 create_hard_link_task。
     """
     optimized_print("初始化硬链接任务...")
-    for file_id in data_store.keys():
+    today_ids=set()
+    for i in os.walk(DOWNLOAD_FOLDER):
+        for j in i[2]:
+            today_ids.add(j.split('.')[0])
+    for file_id in today_ids:
         create_hard_link_task(file_id)
     optimized_print("硬链接初始化完成。")
 
